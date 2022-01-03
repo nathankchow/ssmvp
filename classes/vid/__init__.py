@@ -9,8 +9,8 @@ from pathlib import Path
 import sys
 import openpyxl
 import pytesseract
-from pathlib import Path
 
+#bug: souyoku no aria read from one of the videos, can find in output directort 
 
 class Vid:
     fudge = 2 #delay start of trimmed video by this amount of time (seconds)
@@ -80,7 +80,7 @@ class Vid:
         img2 = img2[0:500,0:100]
         return Vid.mse(img1,img2)
     
-    def find_songname(self, method='ocr'):
+    def find_songname(self, method='ocr', find_solo_idol = False):
         if self.songname == None:  
             if method == 'ocr':
                 workbook = 'data/songlist.xlsx'
@@ -127,17 +127,43 @@ class Vid:
                         song_name = song
                         highest = difflib.SequenceMatcher(None, txt, song).ratio()
                 self.songname = song_name 
+                if find_solo_idol == True:
+                    def mid_crop(crop):
+                        _ = cv2.resize(crop, (1920,1080))
+                        return _[500:550, 925:975]
+                    def crop_to_idol(crop):
+                        idols = ['arisu','koharu','yoshino','yumi','yukimi']
+                        templates = [
+                        cv2.imread('data/template/arisu.png'),
+                        cv2.imread('data/template/koharu.png'),
+                        cv2.imread('data/template/yoshino.png'),
+                        cv2.imread('data/template/yumi.png'),
+                        cv2.imread('data/template/yukimi.png')
+                        ]
+                        err_best = 999999999 
+                        i = 0 #keep a manual counter since index on cv2.im objects is iffy 
+                        for template in templates:
+                            err = Vid.mse(crop,template)
+                            if err < err_best:
+                                err_best = err
+                                name = idols[i]
+                            i += 1
+                        return name 
+                    self.solo_name = crop_to_idol(mid_crop(image))
+
                 vidcap.release()
  
     def jumpSearch(self,file_path,jump,func,tolerance=100,mode = 'in', direction = 1, stepSize = 1,
                start = None ,stepback = False, debug = False):
-    #takes an initial time (jump[seconds]) as input, and marches constantly (direction[1 or -1]) * (stepSize) seconds 
-    #looking "towards" (mode = 'in') or "away from" (mode = 'out')
-    #a template picture specified by func located inside the video file
-    #(e.g func = loadingcompare, func = mvcompare). When the target is reached, can either return
-    #the final time (default), or the time one step before the target was reached (stepback = True).
-    #mode = "endIn" is a special case that is more resource intensive than 'in', but is integral for
-    #finding the end duration of the trimmed video 
+        '''
+        takes an initial time (jump[seconds]) as input, and marches constantly (direction[1 or -1]) * (stepSize) seconds 
+        looking "towards" (mode = 'in') or "away from" (mode = 'out')
+        a template picture specified by func located inside the video file
+        (e.g func = loadingcompare, func = mvcompare). When the target is reached, can either return
+        the final time (default), or the time one step before the target was reached (stepback = True).
+        mode = "endIn" is a special case that is more resource intensive than 'in', but is integral for
+        finding the end duration of the trimmed video 
+        '''
         step = direction * stepSize
         if mode == 'in':
             err = 9E9 #dummy value
@@ -296,6 +322,8 @@ class Vid:
         self.old_filedir = self.filedir
         self.filedir = 'temp/temp_main.mkv'
 
+
+
     def find_start(self,debug=False):
         if self.start is None:
             jump = 0 
@@ -352,6 +380,14 @@ class Vid:
             jump = self.bisection(self.filedir, jump, start = self.start,func = Vid.loadingcompare) 
             self.end = jump
     
+    def write_log(self):
+        if os.path.isfile(os.path.join('data','log.csv')) != True:
+            with open(os.path.join('data','log.csv'),'w+',encoding='utf-8') as f:
+                f.write('NAME,COMMAND\n')
+        with open(os.path.join('data','log.csv'),'a',encoding='utf-8') as f:   
+            f.write(f"{','.join(self.ffmpeg_command)}\n")
+
+
     def trim_mkv(self):
         ffmpeg_command = 'ffmpeg '
         if self.start != None:
@@ -363,11 +399,22 @@ class Vid:
             elif self.start == None:
                 ffmpeg_command += f'-t {self.end} ' 
         ffmpeg_command += '-c copy temp/temp_output.mkv    '
+        self.ffmpeg_command = [self.old_filedir, ffmpeg_command]
         subprocess.run(ffmpeg_command)
+        self.write_log()
 
     
     def cleanup(self):
+        '''
+        output file gets named here
+        '''
         new_filename = Path(self.old_filedir).name
+        os.rename('temp/output_final.mp4',f'output/{new_filename}') #make sure this works
+        for file in os.listdir('temp'):
+            os.remove(f'temp/{file}')
+
+    def solo_cleanup(self):
+        new_filename = self.solo_rename()
         os.rename('temp/output_final.mp4',f'output/{new_filename}') #make sure this works
         for file in os.listdir('temp'):
             os.remove(f'temp/{file}')
@@ -416,6 +463,30 @@ class Vid:
         self.mkvtomp4()
         self.cleanup_compilation()
         self.remove_original_file()
+    
+    def solo_pipeline(self):
+        self.set_rotation_metadata()
+        self.mp4tomkv()
+        self.find_songname(find_solo_idol=True)
+        self.find_start()
+        self.find_rough_end()
+        self.find_end_from_rough_end()
+        self.trim_mkv()
+        self.mkvtomp4()
+        self.solo_cleanup()
+        self.remove_original_file()
+    
+    def solo_rename(self):
+        name_dict = {
+            "arisu": "arisuSSB",
+            "koharu": "koharuCD",
+            "yoshino": "yoshino3",
+            "yukimi": "yukimiSSB",
+            "yumi": "yumi2"
+        }
+        new_name = f"[デレステ] {self.songname} {name_dict[self.solo_name]}.mp4"
+        return new_name
+
 
     def keep_start_pipeline(self):
         self.mp4tomkv()

@@ -5,7 +5,8 @@ import os
 import cv2
 import sys
 
-def permutation_rename():
+
+def permutation_rename(confirm=True):
     #ask user to specify song name, along with number of singers 
     if len(sys.argv) != 4:
         songname = input('Please specify the song name:\n')
@@ -17,7 +18,14 @@ def permutation_rename():
 
         print(f'Song name: {songname}\nNumber of singers: {singers}\nDirectory: {directory}\n')
         input('Press enter to continue...')
-    
+    else:
+        songname = sys.argv[1]
+        singers = int(sys.argv[2])
+        directory = sys.argv[3]
+        if confirm == True:
+            print(f'Song name: {songname}\nNumber of singers: {singers}\nDirectory: {directory}\n')
+            input('Press enter to continue...')
+        
     #settings
     order = [2,1,3,0,4]
     x_list = [400, 662, 925, 1187, 1450] 
@@ -47,6 +55,18 @@ def permutation_rename():
         crops = []
         vidcap = cv2.VideoCapture(os.path.join(directory,vid))
         success,image = vidcap.read()
+        if Vid.mvcompare(cv2.resize(image, (1600,900))) > 1500:
+            i = 0 
+            jump = 0
+            while True:
+                jump += 1000
+                vidcap.set(cv2.CAP_PROP_POS_MSEC,jump)
+                success,image = vidcap.read()
+                if Vid.mvcompare(cv2.resize(image, (1600,900))) < 1500:
+                    break
+                elif i == 15:
+                    raise Exception(f'idol information cannot be found in {vid}')
+                i += 1
         vidcap.release()
         for i in range(0,int(singers)):
             crop = image[y:y+h,x_list[order[i]]:x_list[order[i]]+h]
@@ -62,9 +82,30 @@ def permutation_rename():
         elif new_filename == os.path.join(directory,vid):
             pass
         elif os.path.exists(new_filename):
+            print(vid, new_filename)
             raise ValueError
+        print(f'{vid} renamed to {new_filename}')
 
     return directory 
+
+def crop_to_idol(crop):
+    idols = ['arisu','koharu','yoshino','yumi','yukimi']
+    templates = [
+    cv2.imread('data/template/arisu.png'),
+    cv2.imread('data/template/koharu.png'),
+    cv2.imread('data/template/yoshino.png'),
+    cv2.imread('data/template/yumi.png'),
+    cv2.imread('data/template/yukimi.png')
+    ]
+    err_best = 999999999 
+    i = 0 #keep a manual counter since index on cv2.im objects is iffy 
+    for template in templates:
+        err = Vid.mse(crop,template)
+        if err < err_best:
+            err_best = err
+            name = idols[i]
+        i += 1
+    return name 
 
 if __name__ == '__main__':
     permutation_rename()

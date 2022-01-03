@@ -3,6 +3,7 @@ from pathlib import Path
 import tkinter.filedialog
 import tkinter as tk
 import os
+import sys
 
 def check_dir_integrity(directory=None):
     if directory == None:
@@ -16,7 +17,7 @@ def check_dir_integrity(directory=None):
         
 
 if __name__ == "__main__":
-    check_dir_integrity("C:/users/natha/desktop/apapap")
+    check_dir_integrity()
 
 
         

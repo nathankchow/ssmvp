@@ -9,12 +9,18 @@
 
 from permutation_rename import permutation_rename
 from permutation_process import permutation_process 
-from check_dir_integrity import check_dir_integrity 
+from check_dir_integrity import check_dir_integrity
+import sys
+import time
+import os
 
 def permutation_master():
-    directory = permutation_rename()
+    directory = permutation_rename(confirm=False)
     check_dir_integrity(directory)
     permutation_process(directory)
+    for file in os.listdir('output'):
+       os.rename(os.path.join('output',file), os.path.join(directory,file))
+    print(f'Files moved from output to {directory}.')
 
 if __name__ == '__main__':
     permutation_master()
