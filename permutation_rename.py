@@ -52,6 +52,7 @@ def permutation_rename(confirm=True):
         return name 
 
     for vid in os.listdir(directory):
+        try_reverse = False
         crops = []
         vidcap = cv2.VideoCapture(os.path.join(directory,vid))
         success,image = vidcap.read()
@@ -65,8 +66,26 @@ def permutation_rename(confirm=True):
                 if Vid.mvcompare(cv2.resize(image, (1600,900))) < 1500:
                     break
                 elif i == 15:
-                    raise Exception(f'idol information cannot be found in {vid}')
+                    try_reverse = True
+                    break
                 i += 1
+        if try_reverse:
+            i = 0 
+            jump = 0
+            while True:
+                jump += 1000
+                vidcap.set(cv2.CAP_PROP_POS_MSEC,jump)
+                success,image = vidcap.read()
+                image = cv2.rotate(image, cv2.ROTATE_180) #try flipping?
+                # cv2.imshow("flipping did happen", image)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
+                if Vid.mvcompare(cv2.resize(image, (1600,900))) < 1500:
+                    break
+                elif i == 15:
+                    raise Exception("flipping doesnt work ig")
+                i += 1
+
         vidcap.release()
         for i in range(0,int(singers)):
             crop = image[y:y+h,x_list[order[i]]:x_list[order[i]]+h]
