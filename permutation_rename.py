@@ -98,12 +98,13 @@ def permutation_rename(confirm=True):
         new_filename = os.path.join(directory,f"[デレステ] {songname} {'-'.join(idols)}.mp4")
         if not os.path.exists(new_filename):
             os.rename(os.path.join(directory,vid),new_filename)
+            print(f'{vid} renamed to {new_filename}')
         elif new_filename == os.path.join(directory,vid):
-            pass
+            print(f"no change in naming of {new_filename}")
         elif os.path.exists(new_filename):
-            print(vid, new_filename)
-            raise ValueError
-        print(f'{vid} renamed to {new_filename}')
+            print(f"{new_filename} already exists, duplicate video. no renaming was performed.")
+            
+        
 
     return directory 
 
